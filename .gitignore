@@ -1,0 +1,7 @@
+echo .terraform/
+echo *.tfstate
+echo *.tfstate*
+echo *.tfvars
+echo id_rsa.pem
+echo node_modules/
+echo .env
