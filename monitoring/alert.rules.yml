@@ -1,0 +1,20 @@
+groups:
+  - name: streaming_app_alerts
+    rules:
+      - alert: BackendAPIDown
+        expr: up{job="backend-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend API pod is down"
+          description: "Backend streaming API has been unreachable for more than 1 minute."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node Memory Usage > 85%"
+          description: "Free Tier EC2 memory usage is high. Swap memory is active."

@@ -1,0 +1,106 @@
+name: 🛡️ End-to-End DevSecOps & K8s Deployment
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  security-scans:
+    name: Code & Vulnerability Scans
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy FS Scan (Misconfigurations & Secrets)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0' # Non-blocking for first demo run
+
+  build-and-push:
+    name: Docker Build & Security Scan
+    needs: security-scans
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Backend API Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend-api
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/netflix-backend-api:latest
+
+      - name: Build & Push Frontend UI Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/netflix-frontend:latest
+
+  terraform-infrastructure:
+    name: Provision AWS Cloud Resources
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    outputs:
+      ec2_ip: ${{ steps.tf_outputs.outputs.ec2_ip }}
+      cdn_url: ${{ steps.tf_outputs.outputs.cdn_url }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init & Apply
+        id: tf_outputs
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve
+          echo "ec2_ip=$(terraform output -raw ec2_public_ip)" >> "$GITHUB_OUTPUT"
+          echo "cdn_url=$(terraform output -raw cloudfront_streaming_url)" >> "$GITHUB_OUTPUT"
+
+  k8s-deploy:
+    name: Deploy to K3s Cluster
+    needs: terraform-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key & Connect via Ansible
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > terraform/id_rsa.pem
+          chmod 400 terraform/id_rsa.pem
+          sed -i "s/TARGET_EC2_IP/${{ needs.terraform-infrastructure.outputs.ec2_ip }}/g" ansible/inventory.ini
+
+      - name: Run Ansible Configuration
+        run: |
+          cd ansible
+          ansible-playbook -i inventory.ini deploy.yml
+
+      - name: Deploy Kubernetes Manifests
+        run: |
+          ssh -o StrictHostKeyChecking=no -i terraform/id_rsa.pem ubuntu@${{ needs.terraform-infrastructure.outputs.ec2_ip }} "mkdir -p ~/k8s"
+          scp -o StrictHostKeyChecking=no -i terraform/id_rsa.pem -r k8s/* ubuntu@${{ needs.terraform-infrastructure.outputs.ec2_ip }}:~/k8s/
+          ssh -o StrictHostKeyChecking=no -i terraform/id_rsa.pem ubuntu@${{ needs.terraform-infrastructure.outputs.ec2_ip }} "kubectl apply -f ~/k8s/00-namespace.yaml && kubectl apply -f ~/k8s/01-secrets.yaml && kubectl apply -f ~/k8s/02-configmap.yaml && kubectl apply -f ~/k8s/database/ && kubectl apply -f ~/k8s/backend/ && kubectl apply -f ~/k8s/frontend/ && kubectl apply -f ~/k8s/ingress.yaml"

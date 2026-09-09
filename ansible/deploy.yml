@@ -1,0 +1,68 @@
+---
+- name: Configure EC2 Node for Lightweight K3s and Swap Memory
+  hosts: k8s_node
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # 1. Setup 2GB Swap Memory (Critical for Free Tier 1GB RAM stability)
+    - name: Check if swap file exists
+      stat:
+        path: /swapfile
+      register: swap_file_stat
+
+    - name: Create 2GB swap file
+      command: fallocate -l 2G /swapfile
+      when: not swap_file_stat.stat.exists
+
+    - name: Set correct permissions on swap file
+      file:
+        path: /swapfile
+        owner: root
+        group: root
+        mode: '0600'
+      when: not swap_file_stat.stat.exists
+
+    - name: Format swap file
+      command: mkswap /swapfile
+      when: not swap_file_stat.stat.exists
+
+    - name: Enable swap file
+      command: swapon /swapfile
+      when: not swap_file_stat.stat.exists
+
+    - name: Persist swap file in /etc/fstab
+      mount:
+        name: none
+        src: /swapfile
+        fstype: swap
+        opts: sw
+        state: present
+
+    # 2. Install Docker & Prerequisites
+    - name: Install curl and dependencies
+      apt:
+        name:
+          - curl
+          - apt-transport-https
+          - ca-certificates
+        state: present
+
+    # 3. Install Lightweight Kubernetes (K3s)
+    - name: Check if K3s is already installed
+      stat:
+        path: /usr/local/bin/k3s
+      register: k3s_installed
+
+    - name: Install K3s server
+      shell: curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
+      when: not k3s_installed.stat.exists
+
+    - name: Ensure K3s service is running
+      systemd:
+        name: k3s
+        state: started
+        enabled: yes

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: media-app
+data:
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  CDN_URL: "https://d12345abcdef.cloudfront.net"
