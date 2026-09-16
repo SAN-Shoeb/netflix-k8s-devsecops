@@ -1,5 +1,5 @@
-# Stage 1: Build React Frontend
-FROM node:18-bullseye-slim AS builder
+# Stage 1: Build using Node 16 (Native compatibility with react-scripts 5)
+FROM node:16-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -8,10 +8,9 @@ RUN npm install --legacy-peer-deps
 COPY . .
 ENV CI=false
 
-# Run build directly with detailed logging enabled
-RUN npm run build || (echo "=== NPM BUILD LOGS BEGIN ===" && cat /root/.npm/_logs/*-debug-0.log 2>/dev/null && exit 1)
+RUN npm run build
 
-# Stage 2: Serve using Nginx
+# Stage 2: Serve via Nginx
 FROM nginx:alpine
 COPY --from=builder /app/build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
