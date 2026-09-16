@@ -1,5 +1,5 @@
-# Stage 1: Build using Node 16 (Native compatibility with react-scripts 5)
-FROM node:16-alpine AS builder
+# Stage 1: Build Frontend
+FROM node:18 AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -8,7 +8,8 @@ RUN npm install --legacy-peer-deps
 COPY . .
 ENV CI=false
 
-RUN npm run build
+# verbose flag se exact failure console par print hoga
+RUN npx react-scripts build --verbose
 
 # Stage 2: Serve via Nginx
 FROM nginx:alpine
