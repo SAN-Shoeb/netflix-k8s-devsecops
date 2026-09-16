@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+ENV CI=false
 RUN npm run build
 
 # Stage 2: Serve using lightweight Nginx Alpine (< 25MB footprint)
