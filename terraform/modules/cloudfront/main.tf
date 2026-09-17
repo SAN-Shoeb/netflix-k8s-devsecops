@@ -1,5 +1,5 @@
 resource "aws_cloudfront_origin_access_control" "oac" {
-  name                              = "s3-video-oac"
+  name                              = "s3-video-oac-v2"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
@@ -8,6 +8,7 @@ resource "aws_cloudfront_origin_access_control" "oac" {
 resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   is_ipv6_enabled     = true
+  wait_for_deployment = false
   default_root_object = "index.html"
 
   origin {
