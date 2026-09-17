@@ -15,13 +15,13 @@ terraform {
     }
   }
 
-  #backend "s3" {
-  #  bucket         = "netflix-k8s-tfstate-98234"
-   # key            = "netflix-clone/terraform.tfstate"
-  #  region         = "us-east-1"
-   # dynamodb_table = "netflix-k8s-tf-locks"
-   # encrypt        = true
-  #}
+  backend "s3" {
+    bucket         = "netflix-k8s-tfstate-98234"
+    key            = "netflix-clone/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "netflix-k8s-tf-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
