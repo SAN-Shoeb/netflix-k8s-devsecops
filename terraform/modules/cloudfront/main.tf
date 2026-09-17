@@ -1,8 +1,13 @@
 resource "aws_cloudfront_origin_access_control" "oac" {
-  name                              = "s3-video-oac-v2"
+  name_prefix                       = "netflix-oac-"   # Har bar unique suffix auto-generate karega
+  description                       = "OAC for Netflix S3 media bucket"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_cloudfront_distribution" "cdn" {
