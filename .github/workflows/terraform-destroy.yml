@@ -1,0 +1,53 @@
+name: 🚨 Destroy Infrastructure (Terraform Destroy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type "DESTROY" to confirm teardown of all AWS resources'
+        required: true
+        default: ''
+
+jobs:
+  terraform-destroy:
+    name: Teardown AWS Cloud Resources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Safety Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirmation }}" != "DESTROY" ]; then
+            echo "❌ Teardown aborted: Input confirmation did not match 'DESTROY'."
+            exit 1
+          fi
+          echo "✅ Teardown confirmed. Proceeding with resource cleanup..."
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Empty S3 Media Bucket (Prerequisite for S3 Destroy)
+        run: |
+          # AWS non-empty buckets ko destroy karne se block karta hai
+          # Isliye pehle objects empty karna safe practice hai
+          BUCKET_NAME="netflix-k8s-media-dev-98234"
+          if aws s3 ls "s3://${BUCKET_NAME}" 2>&1 | grep -q 'NoSuchBucket'; then
+            echo "Bucket already deleted or does not exist."
+          else
+            echo "Emptying bucket s3://${BUCKET_NAME} before destroy..."
+            aws s3 rm s3://${BUCKET_NAME} --recursive || true
+          fi
+
+      - name: Terraform Init & Destroy
+        run: |
+          cd terraform
+          terraform init
+          terraform destroy -auto-approve
