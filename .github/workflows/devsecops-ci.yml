@@ -19,7 +19,7 @@ jobs:
           scan-type: 'fs'
           scan-ref: '.'
           severity: 'HIGH,CRITICAL'
-          exit-code: '0' # Non-blocking for first demo run
+          exit-code: '0'
 
   build-and-push:
     name: Docker Build & Security Scan
@@ -56,6 +56,7 @@ jobs:
     outputs:
       ec2_ip: ${{ steps.tf_outputs.outputs.ec2_ip }}
       cdn_url: ${{ steps.tf_outputs.outputs.cdn_url }}
+      private_key: ${{ steps.tf_outputs.outputs.private_key }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -78,21 +79,28 @@ jobs:
           terraform apply -auto-approve
           echo "ec2_ip=$(terraform output -raw ec2_public_ip)" >> "$GITHUB_OUTPUT"
           echo "cdn_url=$(terraform output -raw cloudfront_streaming_url)" >> "$GITHUB_OUTPUT"
+          
+          # Multiline sensitive private key safely written to GITHUB_OUTPUT
+          echo "private_key<<EOF" >> "$GITHUB_OUTPUT"
+          terraform output -raw private_key >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
   k8s-deploy:
     name: Deploy to K3s Cluster
     needs: terraform-infrastructure
     runs-on: ubuntu-latest
-    environment: production 	
+    environment: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup SSH Key & Connect via Ansible
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > terraform/id_rsa.pem
-          chmod 400 terraform/id_rsa.pem
+          mkdir -p terraform ~/.ssh
+          cat << 'EOF' > terraform/id_rsa.pem
+          ${{ needs.terraform-infrastructure.outputs.private_key }}
+          EOF
+          chmod 600 terraform/id_rsa.pem
           sed -i "s/TARGET_EC2_IP/${{ needs.terraform-infrastructure.outputs.ec2_ip }}/g" ansible/inventory.ini
 
       - name: Run Ansible Configuration
