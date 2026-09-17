@@ -1,5 +1,5 @@
-# Stage 1: Build Frontend
-FROM node:18 AS builder
+# Stage 1: Build React Frontend
+FROM node:18-bullseye-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -7,9 +7,7 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 ENV CI=false
-
-# verbose flag se exact failure console par print hoga
-RUN npx react-scripts build --verbose
+RUN npm run build
 
 # Stage 2: Serve via Nginx
 FROM nginx:alpine

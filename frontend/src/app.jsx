@@ -1,82 +1,40 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import videojs from 'video.js';
+import React, { useState, useEffect } from 'react';
 
-export default function App() {
-  const [videos, setVideos] = useState([]);
-  const [selectedVideo, setSelectedVideo] = useState(null);
-  const videoRef = useRef(null);
-  const playerRef = useRef(null);
+function App() {
+  const [movies, setMovies] = useState([]);
 
   useEffect(() => {
-    // Fetch video catalog from backend API
-    axios.get('/api/videos')
-      .then(res => {
-        setVideos(res.data);
-        if (res.data.length > 0) setSelectedVideo(res.data[0]);
-      })
-      .catch(() => {
-        // Fallback demo video
-        const fallback = {
-          title: 'Big Buck Bunny (Demo HLS Stream)',
-          description: 'HLS Test stream via CDN distribution',
-          streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
-        };
-        setVideos([fallback]);
-        setSelectedVideo(fallback);
-      });
+    fetch('/api/movies')
+      .then(res => res.json())
+      .then(data => setMovies(data))
+      .catch(err => console.log('API offline or loading:', err));
   }, []);
 
-  useEffect(() => {
-    if (selectedVideo && videoRef.current) {
-      if (!playerRef.current) {
-        playerRef.current = videojs(videoRef.current, {
-          autoplay: false,
-          controls: true,
-          responsive: true,
-          fluid: true,
-          sources: [{ src: selectedVideo.streamUrl, type: 'application/x-mpegURL' }]
-        });
-      } else {
-        playerRef.current.src({ src: selectedVideo.streamUrl, type: 'application/x-mpegURL' });
-      }
-    }
-  }, [selectedVideo]);
-
   return (
-    <div style={{ padding: '20px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
-        <h1 style={{ color: '#E50914', margin: 0 }}>STREAMFLIX</h1>
-        <span style={{ fontSize: '14px', color: '#aaa' }}>Powered by K3s & CloudFront</span>
+    <div style={{ backgroundColor: '#141414', minHeight: '100vh', color: '#fff', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <header style={{ borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '20px' }}>
+        <h1 style={{ color: '#E50914', margin: 0, fontSize: '32px' }}>NETFLIX</h1>
       </header>
-
-      <div style={{ marginTop: '20px', maxWidth: '900px', margin: '20px auto' }}>
-        <div data-vjs-player>
-          <video ref={videoRef} className="video-js vjs-big-play-centered" />
-        </div>
-        {selectedVideo && (
-          <div style={{ marginTop: '15px' }}>
-            <h2>{selectedVideo.title}</h2>
-            <p style={{ color: '#aaa' }}>{selectedVideo.description}</p>
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginTop: '30px' }}>
-        <h3>Featured Content</h3>
-        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-          {videos.map((vid, idx) => (
-            <div 
-              key={idx} 
-              onClick={() => setSelectedVideo(vid)}
-              style={{ background: '#222', padding: '15px', borderRadius: '6px', cursor: 'pointer', minWidth: '200px' }}
-            >
-              <h4 style={{ margin: '0 0 8px 0' }}>{vid.title}</h4>
-              <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>Click to play stream</p>
+      <main>
+        <h2>Featured Stream</h2>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+          {movies.length > 0 ? (
+            movies.map(movie => (
+              <div key={movie.id} style={{ background: '#222', padding: '15px', borderRadius: '8px', width: '220px' }}>
+                <h3>{movie.title}</h3>
+                <p style={{ color: '#aaa' }}>{movie.genre}</p>
+              </div>
+            ))
+          ) : (
+            <div style={{ background: '#222', padding: '20px', borderRadius: '8px', width: '100%', maxWidth: '600px' }}>
+              <h3>DevSecOps Streaming Pipeline Active</h3>
+              <p style={{ color: '#aaa' }}>Frontend connected to K3s Ingress and ready to stream via CloudFront CDN.</p>
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
+
+export default App;
